@@ -1,85 +1,197 @@
+/**
+ * @typedef {Object} HttpClient
+ * @property {function(string, Object=): Promise<*>} get
+ * @property {function(string, *=, Object=): Promise<*>} post
+ */
+
+/** @type {HttpClient | undefined} */
 let __api_axios_instance__;
 
 export const ApiCentralConfig = {
-    setAxiosInstance: (instance) => __api_axios_instance__ = instance,
-}
 
-export const apiUrl = (apiAction, params) => {
-    const query = Object.keys(params)
-        .map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
-        .join('&');
+    /** @param {HttpClient} instance */
+    setAxiosInstance: (instance) => {
 
-    return apiAction + '?' + query;
+        if (!instance || typeof instance.get !== 'function' || typeof instance.post !== 'function') {
+
+            throw new TypeError('API Central requires an Axios instance with get() and post() methods.');
+
+        }
+
+        return __api_axios_instance__ = instance;
+
+    },
+
 };
 
-export const prepareUrlParams = (params) => {
-    let usp = new URLSearchParams();
-    for (let param in params) {
-        // noinspection JSUnfilteredForInLoop
-        usp.append(param, params[param]);
-    }
-    return usp;
-};
+const getAxiosInstance = () => {
 
-export const prepareFormData = (params) => {
-    let formData = new FormData();
-    for (let param in params) {
-        // noinspection JSUnfilteredForInLoop
-        formData.append(
-            param,
-            params[param]
-        );
+    if (!__api_axios_instance__) {
+
+        throw new Error('Configure API Central with ApiCentralConfig.setAxiosInstance(instance) before making requests.');
+
     }
-    return formData;
+
+    return __api_axios_instance__;
+
 };
 
 /**
- * Blob is different from "File" object,
- * an additional parameter should be prepared for name to be sent
+ * Append own enumerable parameters without changing an existing query or fragment.
  *
- * @param params
- * @param fnList
+ * @param {string} apiAction
+ * @param {Object} [params]
+ * @returns {string}
+ */
+export const apiUrl = (apiAction, params = {}) => {
+
+    const query = Object.entries(params ?? {})
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+        .join('&');
+
+    if (!query) return apiAction;
+
+    const hashIndex = apiAction.indexOf('#');
+
+    const url = hashIndex < 0 ? apiAction : apiAction.slice(0, hashIndex);
+
+    const fragment = hashIndex < 0 ? '' : apiAction.slice(hashIndex);
+
+    const separator = url.includes('?') ? (/[?&]$/.test(url) ? '' : '&') : '?';
+
+    return url + separator + query + fragment;
+
+};
+
+/**
+ * Prepare a flat, URL-encoded request body.
+ *
+ * @param {Object} [params]
+ * @returns {URLSearchParams}
+ */
+export const prepareUrlParams = (params = {}) => {
+
+    const usp = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(params ?? {})) {
+
+        usp.append(key, value);
+
+    }
+
+    return usp;
+
+};
+
+/**
+ * Prepare multipart data, preserving native File names.
+ *
+ * @param {Object} [params]
  * @returns {FormData}
  */
-export const prepareFormDataWithBlob = (params, fnList) => {
-    let formData = new FormData();
+export const prepareFormData = (params = {}) => prepareFormDataWithBlob(params);
+
+/**
+ * Optional filenames correspond to Blob/File values in property order.
+ * Omitted filenames retain a File's name or the native Blob default.
+ *
+ * @param {Object} [params]
+ * @param {Array<string>} [fnList]
+ * @returns {FormData}
+ */
+export const prepareFormDataWithBlob = (params = {}, fnList = []) => {
+
+    const formData = new FormData();
+
     let blobN = 0;
-    for (let param in params) {
-        if (params.hasOwnProperty(param)) {
-            params[param] instanceof Blob ?
-                formData.append(param, params[param], fnList[blobN++]) :
-                formData.append(param, params[param]);
+
+    for (const [key, value] of Object.entries(params ?? {})) {
+
+        const filename = typeof Blob !== 'undefined' && value instanceof Blob ? fnList?.[blobN++] : undefined;
+
+        if (filename == null) {
+
+            formData.append(key, value);
+
+        } else {
+
+            formData.append(key, value, filename);
+
         }
+
     }
+
     return formData;
+
 };
 
+/**
+ * GET with the existing API Central query serialization.
+ *
+ * @param {string} url
+ * @param {Object} [params]
+ * @param {Object} [config] Axios request config, passed through unchanged.
+ * @returns {Promise<*>} The original Axios promise and full response.
+ */
+export const apiCall = (url, params = {}, config) => {
 
-export const apiCall = (url, params) => {
-    return __api_axios_instance__.get(apiUrl(url, params));
+    return getAxiosInstance().get(apiUrl(url, params), config);
+
 };
 
-export const apiCallPost = (url, params) => {
-    return __api_axios_instance__.post(url, prepareUrlParams(params));
+/**
+ * POST a flat, URL-encoded body.
+ *
+ * @param {string} url
+ * @param {Object} [params]
+ * @param {Object} [config] Axios request config.
+ * @returns {Promise<*>}
+ */
+export const apiCallPost = (url, params = {}, config) => {
+
+    return getAxiosInstance().post(url, prepareUrlParams(params), config);
+
 };
 
+/**
+ * POST multipart data; let Axios and the runtime set the boundary.
+ *
+ * @param {string} url
+ * @param {Object} [params]
+ * @param {Object} [config] Axios request config.
+ * @returns {Promise<*>}
+ */
+export const apiCallFormData = (url, params = {}, config) => {
 
-export const apiCallFormData = (url, params) => {
-    return __api_axios_instance__.post(url, prepareFormData(params), {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    });
+    return getAxiosInstance().post(url, prepareFormData(params), config);
+
 };
 
-export const apiCallFormDataWithBlob = (url, params, fnList) => {
-    return __api_axios_instance__.post(url, prepareFormDataWithBlob(params, fnList), {
-        headers: {
-            'Content-Type': 'multipart/form-data',
-        },
-    });
+/**
+ * POST multipart data with optional Blob/File filenames.
+ *
+ * @param {string} url
+ * @param {Object} [params]
+ * @param {Array<string>} [fnList]
+ * @param {Object} [config] Axios request config.
+ * @returns {Promise<*>}
+ */
+export const apiCallFormDataWithBlob = (url, params = {}, fnList = [], config) => {
+
+    return getAxiosInstance().post(url, prepareFormDataWithBlob(params, fnList), config);
+
 };
 
-export const apiSubmitFormPost = (url, params) => {
-    return __api_axios_instance__.post(url, params);
+/**
+ * POST an already prepared body (for example, an object for JSON or FormData).
+ *
+ * @param {string} url
+ * @param {*} [params]
+ * @param {Object} [config] Axios request config.
+ * @returns {Promise<*>}
+ */
+export const apiSubmitFormPost = (url, params, config) => {
+
+    return getAxiosInstance().post(url, params, config);
+
 };

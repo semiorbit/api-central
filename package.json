@@ -1,10 +1,16 @@
 {
   "name": "@semiorbit/api-central",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "description": "A set of functions for preparing http requests and calling Api",
   "main": "index.js",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "index.js",
+    "README.md"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test"
   },
   "repository": {
     "type": "git",
